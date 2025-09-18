@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: pmsmanagebot-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  app:
+    build: .
+    container_name: pmsmanagebot-app
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app/src
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "5000:5000"
+    command: ["python", "-m", "app.main"]
