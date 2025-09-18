@@ -23,7 +23,7 @@
 ## 快速开始（本地）
 1. 克隆并进入项目目录后，复制环境变量示例：
    ```bash
-   cp data/.env.example data/.env
+   cp .env.example data/.env
    # 至少设置 TG_API_TOKEN、ADMIN_CHAT_ID
    ```
 2. 安装后端依赖：
