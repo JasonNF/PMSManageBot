@@ -36,7 +36,8 @@ apiClient.interceptors.request.use(
     let userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
     
     // 开发环境模拟数据
-    if (process.env.NODE_ENV === 'development' && !initData) {
+    const enableMock = (process.env.VUE_APP_ENABLE_MOCK_TG === 'true');
+    if ((process.env.NODE_ENV === 'development' || enableMock) && !initData) {
       // 创建模拟的 Telegram 认证数据
       const mockUser = {
         id: 123456789,
