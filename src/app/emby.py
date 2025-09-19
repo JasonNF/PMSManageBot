@@ -22,8 +22,26 @@ class Emby:
         base_url: str = settings.EMBY_BASE_URL,
         api_token: str = settings.EMBY_API_TOKEN,
     ) -> None:
-        self.base_url = base_url
+        self.base_url = self._normalize_base_url(base_url)
         self.api_token = api_token
+
+    @staticmethod
+    def _normalize_base_url(url: Optional[str]) -> str:
+        """规范化 Emby 基础 URL：
+        - 处理误写成 "EMBY_BASE_URL=http(s)://..." 的情况
+        - 去掉包裹引号
+        - 去掉末尾斜杠
+        - 若字符串中包含 http 子串，但不含 "://"，自动截取从 http 开始的部分
+        """
+        if not url:
+            return ""
+        s = str(url).strip().strip('"').strip("'")
+        if s.startswith("EMBY_BASE_URL="):
+            s = s.split("=", 1)[1].strip()
+        if "://" not in s and "http" in s:
+            i = s.find("http")
+            s = s[i:]
+        return s.rstrip('/')
 
     def add_user(
         self, username: str, user_template: str = settings.EMBY_USER_TEMPLATE
