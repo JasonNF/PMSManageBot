@@ -75,6 +75,38 @@ def setup_static_files():
         return False
 
 
+def _get_title_override() -> str | None:
+    """获取需要注入的 WEBAPP_TITLE：优先环境变量，然后 settings，最后 .env 文件兜底。"""
+    # 1) 环境变量优先（便于 systemd 覆盖）
+    title = os.getenv("WEBAPP_TITLE")
+    if title:
+        return title.strip().strip('"').strip("'")
+
+    # 2) settings（如果配置里提供了同名字段）
+    title = getattr(settings, "WEBAPP_TITLE", None)
+    if isinstance(title, str) and title.strip():
+        return title.strip().strip('"').strip("'")
+
+    # 3) 兜底：直接从 .env 文件读取（如果存在且包含该项）
+    try:
+        env_path = getattr(settings, "ENV_FILE_PATH", None)
+        if env_path:
+            env_path = Path(env_path)
+            if env_path.exists():
+                with env_path.open("r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        if line.split("=", 1)[0].strip() == "WEBAPP_TITLE":
+                            value = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            if value:
+                                return value
+    except Exception as e:
+        logger.debug(f"读取 .env 中 WEBAPP_TITLE 失败: {e}")
+    return None
+
+
 # 根路径直接返回前端 index.html（200）。如文件不存在，回退到 /app/ 重定向。
 @app.get("/", include_in_schema=False)
 async def serve_root_index():
@@ -82,10 +114,7 @@ async def serve_root_index():
     if index_file.exists():
         try:
             html = index_file.read_text(encoding="utf-8", errors="ignore")
-            # 优先使用 settings.WEBAPP_TITLE，如果不存在则读取环境变量
-            title_override = (
-                getattr(settings, "WEBAPP_TITLE", None) or os.getenv("WEBAPP_TITLE")
-            )
+            title_override = _get_title_override()
             if title_override:
                 # 替换现有 <title>... </title>
                 pattern = re.compile(r"<title>.*?</title>", re.IGNORECASE | re.DOTALL)
@@ -101,10 +130,63 @@ async def serve_root_index():
                     else:
                         # 无 head，直接前置一个最简单的 head+title
                         html = f"<head><title>{title_override}</title></head>" + html
+
+                # 为防止前端 JS 覆盖，再追加运行时强制设置 document.title 的脚本
+                override_script = (
+                    "<script>(function(){var t='" + title_override.replace("'", "\\'") + "';"
+                    "function setTitle(){try{document.title=t;}catch(e){}}");
+                override_script += (
+                    "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded', setTitle);}else{setTitle();}"
+                    "window.addEventListener('load', setTitle);})();</script>"
+                )
+                head_close = re.compile(r"</head>", re.IGNORECASE)
+                if head_close.search(html):
+                    html = head_close.sub(override_script + "</head>", html, count=1)
+                else:
+                    html = "<head>" + override_script + "</head>" + html
             return Response(content=html, media_type="text/html")
         except Exception as e:
             logger.error(f"读取或处理 index.html 失败: {e}")
             # 兜底直接返回文件
+            return FileResponse(str(index_file))
+    return RedirectResponse(url="/app/")
+
+
+@app.get("/app/", include_in_schema=False)
+async def serve_app_index():
+    # 与根路径相同的动态标题注入逻辑，覆盖静态挂载对 /app/ 的默认返回
+    index_file = Path(settings.WEBAPP_STATIC_DIR).absolute() / "index.html"
+    if index_file.exists():
+        try:
+            html = index_file.read_text(encoding="utf-8", errors="ignore")
+            title_override = _get_title_override()
+            if title_override:
+                pattern = re.compile(r"<title>.*?</title>", re.IGNORECASE | re.DOTALL)
+                if pattern.search(html):
+                    html = pattern.sub(f"<title>{title_override}</title>", html, count=1)
+                else:
+                    head_close = re.compile(r"</head>", re.IGNORECASE)
+                    if head_close.search(html):
+                        html = head_close.sub(
+                            f"<title>{title_override}</title></head>", html, count=1
+                        )
+                    else:
+                        html = f"<head><title>{title_override}</title></head>" + html
+
+                override_script = (
+                    "<script>(function(){var t='" + title_override.replace("'", "\\'") + "';"
+                    "function setTitle(){try{document.title=t;}catch(e){}}"
+                    "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded', setTitle);}else{setTitle();}"
+                    "window.addEventListener('load', setTitle);})();</script>"
+                )
+                head_close = re.compile(r"</head>", re.IGNORECASE)
+                if head_close.search(html):
+                    html = head_close.sub(override_script + "</head>", html, count=1)
+                else:
+                    html = "<head>" + override_script + "</head>" + html
+            return Response(content=html, media_type="text/html")
+        except Exception as e:
+            logger.error(f"读取或处理 index.html 失败: {e}")
             return FileResponse(str(index_file))
     return RedirectResponse(url="/app/")
 
