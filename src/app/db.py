@@ -17,6 +17,11 @@ class DB:
         self.con = sqlite3.connect(db)
         self.cur = self.con.cursor()
         # self.create_table()
+        # 启动时进行一次轻量级的表结构迁移，修复历史拼写错误等问题
+        try:
+            self._migrate_schema()
+        except Exception as e:
+            logger.error(f"Schema migration error: {e}")
 
     def create_table(self):
         try:
@@ -37,7 +42,7 @@ class DB:
                 );
 
                 CREATE TABLE invitation(
-                    code, owner, is_used, userd_by
+                    code, owner, is_used, used_by
                 );
 
                 CREATE TABLE statistics(
@@ -99,6 +104,73 @@ class DB:
             logger.warning("Table user is created already, skip...")
         else:
             self.con.commit()
+
+    def _migrate_schema(self):
+        """对已有数据库执行轻量迁移：
+        - 修复 invitation 表历史拼写错误列 userd_by -> used_by
+        - 若两者都不存在，则补充 used_by 列
+        迁移过程尽量幂等，重复执行不报错。
+        """
+        try:
+            # 检查 invitation 表是否存在
+            self.cur.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='invitation'"
+            )
+            if not self.cur.fetchone():
+                return
+
+            # 读取 invitation 表的列信息
+            cols_info = self.cur.execute("PRAGMA table_info(invitation)").fetchall()
+            cols = [c[1] for c in cols_info]
+
+            has_used_by = "used_by" in cols
+            has_userd_by = "userd_by" in cols
+
+            if has_userd_by and not has_used_by:
+                # 优先尝试直接重命名列（SQLite 3.25+ 支持）
+                try:
+                    self.cur.execute(
+                        "ALTER TABLE invitation RENAME COLUMN userd_by TO used_by"
+                    )
+                    self.con.commit()
+                    logger.info("Migrated: invitation.userd_by -> used_by (ALTER RENAME)")
+                    return
+                except Exception as e:
+                    logger.warning(
+                        f"ALTER RENAME failed ({e}), fallback to table rebuild for invitation"
+                    )
+
+                # 回退方案：新建表，迁移数据，再替换
+                try:
+                    self.cur.execute(
+                        "CREATE TABLE IF NOT EXISTS invitation_new (code, owner, is_used, used_by)"
+                    )
+                    self.cur.execute(
+                        "INSERT INTO invitation_new (code, owner, is_used, used_by) "
+                        "SELECT code, owner, is_used, userd_by FROM invitation"
+                    )
+                    self.cur.execute("DROP TABLE invitation")
+                    self.cur.execute("ALTER TABLE invitation_new RENAME TO invitation")
+                    self.con.commit()
+                    logger.info(
+                        "Migrated: invitation.userd_by -> used_by via table rebuild"
+                    )
+                    return
+                except Exception as e:
+                    logger.error(f"Rebuild invitation table failed: {e}")
+                    self.con.rollback()
+
+            # 若既没有 used_by 也没有 userd_by，则补充 used_by 列
+            if not has_used_by and not has_userd_by:
+                try:
+                    self.cur.execute("ALTER TABLE invitation ADD COLUMN used_by")
+                    self.con.commit()
+                    logger.info("Migrated: invitation add missing column used_by")
+                except Exception as e:
+                    logger.error(f"Add used_by column failed: {e}")
+                    self.con.rollback()
+        except Exception as e:
+            logger.error(f"_migrate_schema unexpected error: {e}")
 
     def add_plex_user(
         self,
