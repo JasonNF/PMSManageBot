@@ -217,11 +217,27 @@ def get_user_info_from_tg_id(chat_id, token=settings.TG_API_TOKEN):
     """
     cache_file = settings.TG_USER_INFO_CACHE_PATH
     cache = {}
-    if not cache_file.exists():
-        logger.warning(f"Not found {settings.TG_USER_INFO_CACHE_PATH}")
+    try:
+        if not cache_file.exists():
+            # 首次使用时初始化空缓存文件，避免频繁告警
+            try:
+                cache_file.parent.mkdir(parents=True, exist_ok=True)
+                lock = filelock.FileLock(str(cache_file) + ".lock")
+                with lock:
+                    with open(cache_file, "wb") as f:
+                        pickle.dump({}, f)
+                logger.info(f"初始化 Telegram 用户缓存: {cache_file}")
+            except Exception as e:
+                # 初始化失败时静默返回空缓存，避免影响业务流程
+                logger.debug(f"初始化用户缓存失败，将使用内存空缓存: {e}")
+            return {}
+
+        with open(cache_file, "rb") as f:
+            cache = pickle.load(f)
+    except Exception as e:
+        # 读取失败时使用空缓存，避免报错打断主流程
+        logger.debug(f"读取 Telegram 用户缓存失败，使用空缓存: {e}")
         return {}
-    with open(cache_file, "rb") as f:
-        cache = pickle.load(f)
     return cache.get(chat_id, {})
 
 
