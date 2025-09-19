@@ -331,10 +331,10 @@
               </div>
               <div 
                 class="entrance-url-chip"
-                @click="copyToClipboard('auto.emby.funmedia.10101.io')"
-                title="点击复制线路地址"
+                @click="copyToClipboard(systemStatus.entrance_url || 'https://emby.misaya.org')"
+                :title="`点击复制线路地址：${systemStatus.entrance_url || 'https://emby.misaya.org'}`"
               >
-                auto.emby.funmedia.10101.io
+                {{ systemStatus.entrance_url || 'https://emby.misaya.org' }}
                 <v-icon size="x-small" class="ml-1">mdi-content-copy</v-icon>
               </div>
             </div>

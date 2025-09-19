@@ -5,6 +5,7 @@ from app.webapp.auth import get_telegram_user
 from app.webapp.middlewares import require_telegram_auth
 from app.webapp.schemas import TelegramUser
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+import os
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
@@ -62,12 +63,21 @@ async def get_system_stats(
 async def get_system_status():
     """获取系统状态信息（公开接口，不需要登录）"""
     try:
+        entrance_url = (
+            os.getenv("ENTRANCE_URL")
+            or getattr(settings, "ENTRANCE_URL", None)
+            or getattr(settings, "EMBY_BASE_URL", None)
+            or getattr(settings, "WEBAPP_URL", None)
+            or "https://emby.misaya.org"
+        )
+
         status_data = {
             "plex_register": settings.PLEX_REGISTER,
             "emby_register": settings.EMBY_REGISTER,
             "premium_unlock_enabled": settings.PREMIUM_UNLOCK_ENABLED,
             "premium_daily_credits": settings.PREMIUM_DAILY_CREDITS,
             "credits_transfer_enabled": settings.CREDITS_TRANSFER_ENABLED,
+            "entrance_url": entrance_url,
             "community_links": {
                 "group": getattr(settings, "TG_GROUP", ""),
                 "channel": getattr(
