@@ -14,6 +14,7 @@ from app.webapp.startup.lifespan import lifespan
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 # 创建 FastAPI 应用
@@ -64,8 +65,15 @@ def setup_static_files():
         return False
 
     try:
-        app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="webapp")
+        # 注意：避免挂载在根路径 "/"，否则会遮蔽 /api/* 路由
+        app.mount("/app", StaticFiles(directory=str(static_dir), html=True), name="webapp")
         return True
     except Exception as e:
         logger.error(f"挂载 WebApp 静态文件失败: {e}")
         return False
+
+
+# 将根路径重定向到 /app/
+@app.get("/", include_in_schema=False)
+async def redirect_root_to_app():
+    return RedirectResponse(url="/app/")
