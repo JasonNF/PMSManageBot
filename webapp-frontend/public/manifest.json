@@ -1,7 +1,7 @@
 {
-  "name": "FunMedia 助手",
-  "short_name": "FunMedia",
-  "description": "FunMedia 媒体服务助手应用",
+  "name": "MisayaEmby 助手",
+  "short_name": "MisayaEmby",
+  "description": "MisayaEmby 媒体服务助手应用",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

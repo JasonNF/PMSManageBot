@@ -1,6 +1,6 @@
 // 缓存版本，需要更新缓存时更改此版本号
 const CACHE_VERSION = 'v1.2';
-const CACHE_NAME = `funmedia-assistant-${CACHE_VERSION}`;
+const CACHE_NAME = `misayaemby-assistant-${CACHE_VERSION}`;
 
 // 基础缓存资源（只缓存核心导航资源）
 const urlsToCache = [
@@ -110,7 +110,7 @@ self.addEventListener('push', event => {
     };
     
     event.waitUntil(
-      self.registration.showNotification('FunMedia 助手', options)
+      self.registration.showNotification('MisayaEmby 助手', options)
     );
   }
 });

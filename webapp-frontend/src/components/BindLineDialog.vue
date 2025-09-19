@@ -126,7 +126,7 @@
                     </div>
                     <div class="step">
                       <span class="step-number">4</span>
-                      过滤 "FunMedia" 请求
+                      过滤 "MisayaEmby" 请求
                     </div>
                     <div class="step">
                       <span class="step-number">5</span>

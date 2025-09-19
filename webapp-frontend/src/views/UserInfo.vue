@@ -2,7 +2,7 @@
   <div class="user-info-container">
     <div class="content-wrapper">
       <div class="user-info-header">
-        <h1 class="page-title">FunMedia 用户中心</h1>
+        <h1 class="page-title">MisayaEmby 用户中心</h1>
         <p class="page-subtitle">账户信息与服务管理</p>
       </div>
       
