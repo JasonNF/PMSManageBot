@@ -381,6 +381,9 @@ async def get_user_status(
             "cost_credits": config.cost_credits,
         }
 
+    except HTTPException:
+        # 透传显式的 HTTP 异常（如 404 用户不存在）
+        raise
     except Exception as e:
         logger.error(f"获取用户转盘状态失败: {e}")
         raise HTTPException(
