@@ -34,7 +34,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     /bind\_emby\_line - 绑定 Emby 线路，格式为: 1. `/bind_emby_line 线路` (注意空格) 2. `/bind_emby_line emby_id 线路` (注意空格)
     /unbind\_emby\_line - 解绑 Emby 线路，格式为: 1. `/unbind_emby_line` 2. `/unbind_emby_line emby_id`
 
-    Overseerr 命令:
+    Overseerr 命令：
     /create\_overseerr - 创建 Overseerr 账户，格式为 `/create_overseerr 邮箱 密码` (注意空格)
  
     管理员命令：
@@ -44,10 +44,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """.format(
         settings.INVITATION_CREDITS, settings.UNLOCK_CREDITS, settings.UNLOCK_CREDITS
     )
+    # 在 Telegram 中提供 WebApp 按钮
+    webapp_url = settings.WEBAPP_URL
+    keyboard = InlineKeyboardMarkup(
+        [[InlineKeyboardButton(text="打开 WebApp", web_app=WebAppInfo(url=webapp_url))]]
+    )
     await send_message(
         chat_id=update.effective_chat.id,
         text=textwrap.dedent(body_text),
         parse_mode="markdown",
+        reply_markup=keyboard,
         context=context,
     )
 

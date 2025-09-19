@@ -4,7 +4,7 @@ from app.log import uvicorn_logger as logger
 from app.webapp.auth import get_telegram_user
 from app.webapp.middlewares import require_telegram_auth
 from app.webapp.schemas import TelegramUser
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
@@ -81,6 +81,18 @@ async def get_system_status():
     except Exception as e:
         logger.error(f"获取系统状态信息失败: {str(e)}")
         raise HTTPException(status_code=500, detail="获取系统状态信息失败")
+
+
+@router.get("/healthz", include_in_schema=False)
+async def healthz():
+    """存活检查（公开接口）：进程启动即返回 200。"""
+    return {"status": "ok"}
+
+
+@router.head("/healthz", include_in_schema=False)
+async def healthz_head():
+    """存活检查 HEAD 支持，返回 200 无正文。"""
+    return Response(status_code=200)
 
 
 @router.get("/traffic-overview")
