@@ -14,7 +14,7 @@ from app.webapp.startup.lifespan import lifespan
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 # 创建 FastAPI 应用
@@ -73,7 +73,18 @@ def setup_static_files():
         return False
 
 
-# 将根路径重定向到 /app/
+# 根路径直接返回前端 index.html（200）。如文件不存在，回退到 /app/ 重定向。
 @app.get("/", include_in_schema=False)
-async def redirect_root_to_app():
+async def serve_root_index():
+    index_file = Path(settings.WEBAPP_STATIC_DIR).absolute() / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
     return RedirectResponse(url="/app/")
+
+
+@app.head("/", include_in_schema=False)
+async def root_head_ok():
+    # 允许对根路径发起 HEAD 探测，返回 200
+    from fastapi import Response
+
+    return Response(status_code=200)
