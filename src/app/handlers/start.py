@@ -8,7 +8,7 @@ from telegram.ext import CommandHandler, ContextTypes
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     body_text = """
-    欢迎来到 FunMedia 小助手
+    欢迎来到 MisayaEmby 小助手
 
     公共命令：
     /info - 查看个人信息
