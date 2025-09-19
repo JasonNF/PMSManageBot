@@ -183,8 +183,8 @@ if __name__ == "__main__":
             logger.info(f"Add handler: {var}")
             application.add_handler(val)
 
-    # 根据配置决定是否启动 WebApp
-    if settings.WEBAPP_ENABLE:
+    # 根据配置决定是否启动 WebApp（兼容 ENABLE_WEBAPP 别名）
+    if getattr(settings, "WEBAPP_ENABLE", getattr(settings, "ENABLE_WEBAPP", True)):
         # 启动 API 服务器（在单独的线程中）
         api_thread = threading.Thread(target=start_api_server)
         api_thread.daemon = True
@@ -193,7 +193,7 @@ if __name__ == "__main__":
             f"WebApp 服务已启动 - 监听在 {settings.WEBAPP_HOST}:{settings.WEBAPP_PORT}"
         )
     else:
-        logger.info("WebApp 服务已禁用（在配置中设置 WEBAPP_ENABLE=True 可启用）")
+        logger.info("WebApp 服务已禁用（在配置中设置 WEBAPP_ENABLE=True 或 ENABLE_WEBAPP=True 可启用）")
 
     # 启动 Telegram Bot（在主线程中）
     logger.info("启动 Telegram Bot...")
