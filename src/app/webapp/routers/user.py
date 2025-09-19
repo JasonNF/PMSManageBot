@@ -1,5 +1,7 @@
 from time import time
 from typing import Optional
+import json
+import os
 
 from app.cache import (
     emby_last_user_defined_line_cache,
@@ -46,6 +48,55 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 router = APIRouter(prefix="/api/user", tags=["user"])
 
 
+# 规范化管理员 ID 列表，兼容多种环境变量格式
+def _normalize_admin_ids(value) -> set[int]:
+    """将 ADMIN_CHAT_ID 的各种格式转换为整型集合。
+
+    支持：
+    - Python 原生的 list/tuple/set[int|str]
+    - 单个 int
+    - 字符串（JSON 数组字符串或逗号分隔字符串）
+    - 空值返回空集合
+    """
+    ids: set[int] = set()
+    if value is None:
+        return ids
+    if isinstance(value, (list, tuple, set)):
+        for x in value:
+            try:
+                ids.add(int(str(x).strip()))
+            except Exception:
+                continue
+        return ids
+    if isinstance(value, int):
+        return {value}
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return ids
+        try:
+            parsed = json.loads(s)
+            return _normalize_admin_ids(parsed)
+        except Exception:
+            parts = [p.strip() for p in s.split(',') if p.strip()]
+            for p in parts:
+                try:
+                    ids.add(int(p))
+                except Exception:
+                    continue
+            return ids
+    return ids
+
+
+def _get_admin_ids() -> set[int]:
+    """读取管理员 ID 集合，优先 settings.ADMIN_CHAT_ID，其次环境别名 WEBAPP_ADMIN_IDS。"""
+    ids = _normalize_admin_ids(getattr(settings, "ADMIN_CHAT_ID", []))
+    if not ids:
+        alias = os.getenv("WEBAPP_ADMIN_IDS")
+        if alias:
+            ids = _normalize_admin_ids(alias)
+    return ids
+
 @router.get("/info")
 @require_telegram_auth
 async def get_user_info(
@@ -60,9 +111,8 @@ async def get_user_info(
     db = DB()
     try:
         tg_id = user_id
-        is_admin = False
-        if tg_id in settings.ADMIN_CHAT_ID:
-            is_admin = True
+        # 统一使用规范化后的管理员集合判断
+        is_admin = tg_id in _get_admin_ids()
         user_info = UserInfo(tg_id=tg_id, is_admin=is_admin)
 
         # 获取Plex信息

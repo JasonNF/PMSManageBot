@@ -25,8 +25,64 @@ from app.webapp.schemas import (
     TelegramUser,
 )
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request
+import json
+import os
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+# 规范化管理员 ID 列表，兼容多种环境变量格式
+def _normalize_admin_ids(value) -> set[int]:
+    """将 ADMIN_CHAT_ID 的各种格式转换为整型集合。
+
+    支持：
+    - Python 原生的 list/tuple/set[int|str]
+    - 单个 int
+    - 字符串（JSON 数组字符串或逗号分隔字符串）
+    - 空值返回空集合
+    """
+    ids: set[int] = set()
+    if value is None:
+        return ids
+    # 已是可迭代
+    if isinstance(value, (list, tuple, set)):
+        for x in value:
+            try:
+                ids.add(int(str(x).strip()))
+            except Exception:
+                continue
+        return ids
+    # 单个数字
+    if isinstance(value, int):
+        return {value}
+    # 字符串：尝试 JSON，然后逗号分隔
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return ids
+        try:
+            parsed = json.loads(s)
+            return _normalize_admin_ids(parsed)
+        except Exception:
+            parts = [p.strip() for p in s.split(',') if p.strip()]
+            for p in parts:
+                try:
+                    ids.add(int(p))
+                except Exception:
+                    continue
+            return ids
+    # 其他类型忽略
+    return ids
+
+
+def _get_admin_ids() -> set[int]:
+    """读取管理员 ID 集合，优先 settings.ADMIN_CHAT_ID，其次环境别名 WEBAPP_ADMIN_IDS。"""
+    ids = _normalize_admin_ids(getattr(settings, "ADMIN_CHAT_ID", []))
+    if not ids:
+        alias = os.getenv("WEBAPP_ADMIN_IDS")
+        if alias:
+            ids = _normalize_admin_ids(alias)
+    return ids
 
 
 def check_admin_permission(user: TelegramUser):
@@ -35,7 +91,7 @@ def check_admin_permission(user: TelegramUser):
     if user.id == 123456789:  # 模拟用户ID
         return True
 
-    if user.id not in settings.ADMIN_CHAT_ID:
+    if user.id not in _get_admin_ids():
         raise HTTPException(status_code=403, detail="权限不足，需要管理员权限")
     return True
 
