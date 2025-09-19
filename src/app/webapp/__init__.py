@@ -1,4 +1,6 @@
 import secrets
+import os
+import re
 from pathlib import Path
 
 from app.config import settings
@@ -11,7 +13,7 @@ from app.webapp.routers.admin import router as admin_router
 from app.webapp.routers.invitation import router as invitation_router
 from app.webapp.routers.premium import router as premium_router
 from app.webapp.startup.lifespan import lifespan
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse
@@ -78,13 +80,36 @@ def setup_static_files():
 async def serve_root_index():
     index_file = Path(settings.WEBAPP_STATIC_DIR).absolute() / "index.html"
     if index_file.exists():
-        return FileResponse(str(index_file))
+        try:
+            html = index_file.read_text(encoding="utf-8", errors="ignore")
+            # 优先使用 settings.WEBAPP_TITLE，如果不存在则读取环境变量
+            title_override = (
+                getattr(settings, "WEBAPP_TITLE", None) or os.getenv("WEBAPP_TITLE")
+            )
+            if title_override:
+                # 替换现有 <title>... </title>
+                pattern = re.compile(r"<title>.*?</title>", re.IGNORECASE | re.DOTALL)
+                if pattern.search(html):
+                    html = pattern.sub(f"<title>{title_override}</title>", html, count=1)
+                else:
+                    # 若缺失 <title>，则在 </head> 前插入
+                    head_close = re.compile(r"</head>", re.IGNORECASE)
+                    if head_close.search(html):
+                        html = head_close.sub(
+                            f"<title>{title_override}</title></head>", html, count=1
+                        )
+                    else:
+                        # 无 head，直接前置一个最简单的 head+title
+                        html = f"<head><title>{title_override}</title></head>" + html
+            return Response(content=html, media_type="text/html")
+        except Exception as e:
+            logger.error(f"读取或处理 index.html 失败: {e}")
+            # 兜底直接返回文件
+            return FileResponse(str(index_file))
     return RedirectResponse(url="/app/")
 
 
 @app.head("/", include_in_schema=False)
 async def root_head_ok():
     # 允许对根路径发起 HEAD 探测，返回 200
-    from fastapi import Response
-
     return Response(status_code=200)
