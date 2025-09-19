@@ -2,7 +2,7 @@ import textwrap
 
 from app.config import settings
 from app.utils import send_message
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import CommandHandler, ContextTypes
 
 
